@@ -1,0 +1,105 @@
+0o ---
+artifact-name: ods-backend
+shebang: /usr/bin/env python3
+build-mode: run
+--- o0
+
+from flask import Flask, Response, request, redirect, render_template_string, render_template, jsonify, make_response, send_from_directory, abort
+import os
+import html
+import time
+import threading
+import uuid
+import hashlib
+import base64
+import json
+import re
+from itertools import islice
+from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.serving import WSGIRequestHandler
+from urllib.parse import urlparse
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from PIL import Image
+from datetime import datetime
+
+# --- BACKEND CONFIG ---
+SERVER_DIR = '/var/www/odysea'
+ACCOUNTS_DIR = os.path.join(SERVER_DIR, 'accounts')
+TOKENS_DIR = os.path.join(ACCOUNTS_DIR, 'tokens')
+SERVER_PROTOCOL = 'https'
+SERVER_DOMAIN = "odysea.us.to"
+SERVICE_NAME = 'ODYSEA.us.to'
+
+app = Flask(__name__, template_folder=SERVER_DIR)
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+active_users = {}
+lock = threading.Lock()
+
+# --- BACKEND PATCHES ---
+class NoQueryStringRequestHandler(WSGIRequestHandler):
+    def log_request(self, code='-', size='-'):
+        # Strip query string from the raw request line
+        parsed = urlparse(self.raw_requestline.decode())
+        path = parsed.path
+        self.log('info', '%s %s',
+                 path,
+                 code)
+
+# attempt to get real IP behind cloudflare proxy
+def get_real_ip():
+    # Try to get IPv4 from CF-Connecting-IP or X-Forwarded-For first
+    if 'CF-Connecting-IP' in request.headers:
+        # Prefer IPv4 if present (Cloudflare may send IPv6)
+        ip = request.headers['CF-Connecting-IP']
+        if ':' in ip: # ipv6
+            return ip
+        else:
+            return ip #ipv4
+    elif 'X-Forwarded-For' in request.headers:
+        ip = request.headers['X-Forwarded-For'].split(',')[0].strip()
+        if ':' in ip:
+            return ip
+        else:
+            return ip
+    else:
+        return get_remote_address()
+
+# Rate limit logging
+def rlexceed_callback(_):
+    offending_ip = get_real_ip()
+    endpoint = request.endpoint
+    print(f"\n[WARN] ({offending_ip}) violated the rate limit policy at {endpoint}!")
+
+limiter = Limiter(
+    get_real_ip,
+    app=app,
+    default_limits=["120 per minute"], backend-wide ratelimit default
+    on_breach=rlexceed_callback
+)
+
+def cleanup_inactive_users():
+    while True:
+        with lock:
+            current_time = time.time()
+            # Remove IPs inactive for more than 10 seconds
+            inactive_ips = [ip for ip, last_seen in active_users.items() if current_time - last_seen > 10]
+            for ip in inactive_ips:
+                del active_users[ip]
+        time.sleep(5)
+
+cleanup_thread = threading.Thread(target=cleanup_inactive_users, daemon=True)
+cleanup_thread.start()
+
+
+#:section src/users.obun.py
+#:section src/comments.obun.py
+#:section src/envtroll.obun.py
+#:section src/uploads.obun.py
+#:section src/data.obun.py
+
+
+if __name__ == '__main__':
+    app.run(debug=False, threaded=True, request_handler=NoQueryStringRequestHandler, host='0.0.0.0', port=5000)
