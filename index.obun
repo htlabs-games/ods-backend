@@ -1,11 +1,12 @@
 0o ---
 artifact-name: ods-backend
-shebang: /usr/bin/env python3
+shebang: /usr/bin/env python
 build-mode: run
 --- o0
 
 from flask import Flask, Response, request, redirect, render_template_string, render_template, jsonify, make_response, send_from_directory, abort
 import os
+import sys
 import html
 import time
 import threading
@@ -14,6 +15,7 @@ import hashlib
 import base64
 import json
 import re
+import random
 from itertools import islice
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -22,7 +24,7 @@ from urllib.parse import urlparse
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from PIL import Image
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # --- BACKEND CONFIG ---
 SERVER_DIR = '/var/www/odysea'
@@ -76,7 +78,7 @@ def rlexceed_callback(_):
 limiter = Limiter(
     get_real_ip,
     app=app,
-    default_limits=["120 per minute"], backend-wide ratelimit default
+    default_limits=["120 per minute"], # backend-wide ratelimit default
     on_breach=rlexceed_callback
 )
 
@@ -90,8 +92,8 @@ def cleanup_inactive_users():
                 del active_users[ip]
         time.sleep(5)
 
-cleanup_thread = threading.Thread(target=cleanup_inactive_users, daemon=True)
-cleanup_thread.start()
+statcln_thread = threading.Thread(target=cleanup_inactive_users, daemon=True)
+statcln_thread.start()
 
 
 #:section src/users.obun.py
@@ -99,7 +101,12 @@ cleanup_thread.start()
 #:section src/envtroll.obun.py
 #:section src/uploads.obun.py
 #:section src/data.obun.py
+#:section src/admin.obun.py
+#:section src/cleanup.obun.py
+init_cleanupworker()
 
 
 if __name__ == '__main__':
+    print(f"[INFO] Starting up {SERVICE_NAME}!")
+    print(f"[ADMIN] Visit {SERVER_PROTOCOL}://{SERVER_DOMAIN}{ADMIN_ENDPOINT} with an adminlisted account for more server session stats and remote control. \n")
     app.run(debug=False, threaded=True, request_handler=NoQueryStringRequestHandler, host='0.0.0.0', port=5000)

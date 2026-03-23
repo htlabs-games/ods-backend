@@ -7,19 +7,44 @@ def create_token(username):
     token = str(uuid.uuid4())
     token_path = os.path.join(TOKENS_DIR, f"{token}.token")
     with open(token_path, 'w') as token_file:
-        token_file.write(username)
+        token_file.write(f"{username}\n{datetime.now(timezone.utc).isoformat()}")
     return token
 
 def user_by_token(token):
-    # Retrieve username by token.
+    # Get username by token.
     token_path = os.path.join(TOKENS_DIR, f"{token}.token")
 
-    if os.path.exists(token_path):
-        if os.path.commonpath([TOKENS_DIR, os.path.abspath(token_path)]) != os.path.abspath(TOKENS_DIR):
+    if not os.path.exists(token_path):
+        return None
+    if os.path.commonpath([TOKENS_DIR, os.path.abspath(token_path)]) != os.path.abspath(TOKENS_DIR):
+        return None
+
+    with open(token_path, "r+") as token_file:
+        lines = token_file.read().splitlines()
+
+        if not lines:
             return None
-        with open(token_path, 'r') as token_file:
-            return token_file.read().strip()
-    return None
+
+        username = lines[0]
+        now = datetime.now(timezone.utc)
+        update_needed = False
+
+        if len(lines) < 2:
+            update_needed = True
+        else:
+            try:
+                last_seen = datetime.fromisoformat(lines[1])
+                if now - last_seen > timedelta(days=2): # update timestamp if more than 2 days apart
+                    update_needed = True
+            except ValueError:
+                update_needed = True
+
+        if update_needed:
+            token_file.seek(0)
+            token_file.write(f"{username}\n{now.isoformat()}")
+            token_file.truncate()
+
+        return username
 
 
 @app.before_request
@@ -28,13 +53,14 @@ def log_request():
     user_agent = request.headers.get('User-Agent', 'Unknown')
     endpoint = request.endpoint
 
+    if "Phare" in user_agent: # remove phare.io log spam
+        return
+
     with lock:
         active_users[ip_address] = time.time()
-
+    global estimated_active_users
     estimated_active_users = len(active_users)
-    print(f"\n[INFO] Received a request on {endpoint} from {ip_address} [{user_agent}] \n| Est. active users: {estimated_active_users} |")
-
-
+    print(f"\n| Est. active users: {estimated_active_users} |\n[INFO] Received a request on {endpoint} from {ip_address} [{user_agent}]")
 
 
 @app.route('/api/register-account/', methods=['POST'])
@@ -44,7 +70,8 @@ def register_account():
     ra_email = request.values.get('email')
     ra_password = request.values.get('password')
     ra_isweb = request.form.get('isweb') == 'true'
-    ra_initip = get_real_ip()
+    ra_initip = hashlib.sha256(get_real_ip().encode("utf-8")).hexdigest()
+    ra_joindate = datetime.now(timezone.utc).isoformat()
 
     if not all([ra_username, ra_email, ra_password]):
         if ra_isweb:
@@ -73,6 +100,7 @@ def register_account():
         'password': hashed_password,
         'initialIP': ra_initip,
         'isWeb': ra_isweb,
+        'joinDate': ra_joindate,
         'canUpload': 'true'
     }
 
@@ -98,8 +126,10 @@ def register_account():
     if ra_isweb:
         response = make_response(redirect(f"{SERVER_PROTOCOL}://{SERVER_DOMAIN}/login/welcome-new-user.html"))
         response.set_cookie('web_login_token', token, httponly=True, secure=True, domain=f".{SERVER_DOMAIN}", samesite="Lax", max_age=90*24*60*60)  # expires in 90 days
+        print(f"-> [INFO] {ra_username} just joined {SERVICE_NAME}, yippie!")
         return response
     else:
+        print(f"-> [INFO] {ra_username} (likely a bot) just joined {SERVICE_NAME}, yippie!")
         return jsonify({'message': f'Welcome to {SERVICE_NAME}! Users and bots will soon be required to verify their email to create an account. This is to help prevent spambot attacks.', 'token': token})
 
 @app.route('/api/get-login-token/', methods=['POST'])
