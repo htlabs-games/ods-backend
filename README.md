@@ -28,8 +28,8 @@ cd obun
 Clone this repo and install requirements:
 ```
 git clone https://github.com/htlabs-games/ods-backend.git
+pip install -r requirements.txt
 ```
-(There's no requirements.txt yet, but you can look at the imports on index.obun.)
 
 Run the backend:
 ```
