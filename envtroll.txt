@@ -1,8 +1,0 @@
-{
-	"JAVA_HOME": "418 Snakes don't drink coffee"
-	"ADMIN_URL": "https://r.mtdv.me:443/webadm-8497843023"
-	"DATABASE_URL": "mysql://your.mom"
-	"DATABASE_USER": "michealjordan"
-	"DATABASE_PWD": "ligma696969"
-	"SECRET_KEY": "9+)-z&74@q!o#d&$^jmk1=2w3k_x+8=r)c%p#8y5l=f9_@8y*c"
-}

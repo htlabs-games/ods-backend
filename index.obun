@@ -98,7 +98,6 @@ statcln_thread.start()
 
 #:section src/users.obun.py
 #:section src/comments.obun.py
-#:section src/envtroll.obun.py
 #:section src/uploads.obun.py
 #:section src/data.obun.py
 #:section src/admin.obun.py
