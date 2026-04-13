@@ -242,6 +242,35 @@ def change_password():
 
     return jsonify({'message': 'Password changed successfully'})
 
+@app.route('/api/change-email/', methods=['POST'])
+@limiter.limit("4 per hour")
+def change_email():
+    username = request.values.get('username')
+    password = request.values.get('password')
+    new_email = request.values.get('new_email')
+
+    user_file_path = os.path.join(ACCOUNTS_DIR, f'{username}.json')
+    if not os.path.exists(user_file_path):
+        return jsonify({'message': 'User not found'}), 404
+    if os.path.commonpath([ACCOUNTS_DIR, os.path.abspath(user_file_path)]) != os.path.abspath(ACCOUNTS_DIR):
+        return jsonify({'error': 'No.'}), 403
+
+    with open(user_file_path, 'r') as user_file:
+        user_data = json.load(user_file)
+
+    if not check_password_hash(user_data['password'], password):
+        return jsonify({'message': 'Incorrect password'}), 401
+
+    user_data['email'] = new_email
+    with open(user_file_path, 'w') as user_file:
+        json.dump(user_data, user_file, indent=4)
+
+    if request.form.get('isweb') == 'true':
+        response = make_response(redirect(f"{SERVER_PROTOCOL}://{SERVER_DOMAIN}/me?ref=success"))
+        return response
+
+    return jsonify({'message': 'Email changed successfully'})
+
 @app.route('/api/delete-account/', methods=['POST'])
 @limiter.limit("1 per 3 seconds; 3 per day")
 def delete_account():
