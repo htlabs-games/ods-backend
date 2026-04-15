@@ -9,7 +9,7 @@ Main HTTP backend and API for ODYSEA's online services and website.
 - Server-side page generation for frontpage
 
 ## Setup
-The backend assumes that some directories exist in /var/www/odysea by default.
+The backend currently assumes that some directories exist in /var/www/odysea by default.
 This repo is currently very development-oriented as opposed to something polished
 you can use to host your own ODYSEA server instance, so you're gonna need to look
 at the code files a lot in case documentation or templates are missing. Please, 
@@ -17,6 +17,8 @@ only run this for testing, DO NOT use this for production in your own custom ser
 instances as-is just yet, as it's missing important files needed for a fully-functional 
 and secure instance. (Currently only we at odysea.us.to have those set up as intended,
 and we're planning on making a full custom instance setup guide in the future.)
+
+ods-backend also assumes a Unix-like system (such as a GNU/Linux distribution) will be running it.
 
 Install Obun:
 ```
